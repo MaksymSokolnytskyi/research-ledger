@@ -1,0 +1,10 @@
+{
+  "name": "research-ledger",
+  "version": "0.1.0",
+  "description": "Provenance, failure memory and a quality ratchet for Obsidian research vaults. Inert outside folders that contain ledger.toml.",
+  "author": {
+    "name": "Maksym Sokolnytskyi"
+  },
+  "homepage": "https://github.com/MaksymSokolnytskyi/research-ledger",
+  "license": "MIT"
+}

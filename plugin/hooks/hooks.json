@@ -1,0 +1,17 @@
+{
+  "description": "research-ledger: context intake, failure recall and capture. Silent outside a ledger and when there is nothing to add.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "ledger hook session-start", "timeout": 20 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "ledger hook user-prompt", "timeout": 20 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "ledger hook pre-bash", "timeout": 10 } ] }
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "ledger hook tool-failure", "timeout": 20 } ] }
+    ]
+  }
+}

@@ -1,0 +1,2 @@
+name = "demo: caching an LLM judge"
+agents = ["lab", "bench"]

@@ -1,0 +1,14 @@
+{
+  "name": "research-ledger",
+  "description": "Provenance, failure memory and a quality ratchet for Obsidian research vaults.",
+  "owner": {
+    "name": "Maksym Sokolnytskyi"
+  },
+  "plugins": [
+    {
+      "name": "research-ledger",
+      "source": "./plugin",
+      "description": "Hooks that feed task context and known failures to Claude, capture failed commands (secrets masked), and skills to audit and record."
+    }
+  ]
+}

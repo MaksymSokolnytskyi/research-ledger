@@ -1,0 +1,35 @@
+# research-ledger configuration. Every key is optional; defaults are shown.
+# Docs: https://github.com/MaksymSokolnytskyi/research-ledger
+
+name = "my-research"
+language = "en"            # "en" or "uk": language of the vault templates
+agents = ["main"]          # callsigns of agents/stations that write records
+entry_points = ["_home", "README", "index"]   # notes nobody needs to link to
+stale_after_days = 30      # living notes must be re-verified this often
+
+# Which files are notes. Paths are relative to this file.
+include = ["**/*.md"]
+exclude = [".obsidian/**", "templates/**", ".ledger/**", ".git/**", "node_modules/**", ".venv/**", "**/__pycache__/**"]
+
+[folders]
+definitions = "def"        # one note per defined entity
+atlas = "atlas"            # generated entity pages
+tasks = "tasks"
+records = "logs"           # append-only records (runs, failures, lessons, agent calls)
+registry = "registry"      # claims, failures, predictions
+generated = "_generated"   # other generated pages (_health)
+archive = "archive"
+
+[capture]                  # automatic failure memory from Claude Code hooks
+enabled = true
+redact = true              # mask API keys, tokens, passwords and home paths
+extra_secret_patterns = [] # more regexes to mask
+max_output_chars = 4000
+
+[context]                  # task-context packs
+budget_tokens = 3000
+min_score = 1.5            # below this BM25 score a note is not relevant
+inject_on_prompt = true    # attach a pack to Claude Code prompts when relevant
+
+[ratchet]                  # metrics that may improve and may not get worse
+guarded = ["dangling_links", "orphans", "numbers_unsourced_per_1k_words", "lifecycle_missing", "repeat_failure_rate"]

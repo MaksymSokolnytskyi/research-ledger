@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "research-ledger"
+version = "0.1.0"
+description = "Provenance, failure memory and a quality ratchet for Obsidian vaults maintained by people and AI agents."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Maksym Sokolnytskyi" }]
+dependencies = ["pydantic>=2.6", "pyyaml>=6"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "pyright>=1.1.380"]
+
+[project.scripts]
+ledger = "research_ledger.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/research_ledger"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003", "SIM905"]  # word lists read better as text
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
