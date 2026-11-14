@@ -65,7 +65,7 @@ def test_capture_repeat_lesson_and_rate(blank) -> None:
     err = "Exit code 1\nModuleNotFoundError: No module named 'skrf'\nTOKEN=abcd1234efgh"
     first = capture(blank, "Bash", "python -m pytest -q", err)
     assert first is not None and not first.repeat
-    text = (blank.root / "logs" / f"{first.record_id}.md").read_text(encoding="utf-8")
+    text = (blank.root / "records" / f"{first.record_id}.md").read_text(encoding="utf-8")
     assert "abcd1234efgh" not in text and MASK in text
 
     second = capture(blank, "Bash", "pytest tests/other.py", err)
@@ -95,7 +95,7 @@ def test_records_never_overwrite_and_names_are_checked(blank) -> None:
     rec = Record(kind="run", title="Same title", agent="lab")
     p1, p2 = write_record(blank, rec), write_record(blank, rec)
     assert p1 != p2 and p1.exists() and p2.exists()
-    (blank.root / "logs" / "renamed by hand.md").write_text("x", encoding="utf-8")
+    (blank.root / "records" / "renamed by hand.md").write_text("x", encoding="utf-8")
     assert check_integrity(blank).bad_names == ("renamed by hand.md",)
 
 

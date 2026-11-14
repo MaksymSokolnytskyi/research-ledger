@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from research_ledger.audit import AuditResult
+from research_ledger.audit import AuditResult, issue_keys
 from research_ledger.ratchet import RatchetResult
 
 HEALTH_NAME = "_health.md"
@@ -38,9 +38,35 @@ def _link(path: str) -> str:
     return f"[[{Path(path).with_suffix('').as_posix()}]]"
 
 
-def health_page(result: AuditResult, ratchet: RatchetResult) -> str:
+def _section(title: str, items: list[tuple[str, str]], known: set[str]) -> list[str]:
+    """Items as ``(key, line)``. New issues are listed; adopted debt is folded away."""
+    if not items:
+        return []
+    new = [line for key, line in items if key not in known]
+    old = [line for key, line in items if key in known]
+    lines = [f"## {title}: {len(new)} new" + (f", {len(old)} known" if old else ""), ""]
+    lines += [f"- {line}" for line in new]
+    if old:
+        if new:
+            lines.append("")
+        lines.append(f"> [!note]- Known before adoption ({len(old)})")
+        lines += [f"> - {line}" for line in old]
+    return [*lines, ""]
+
+
+def health_page(
+    result: AuditResult, ratchet: RatchetResult, known: dict[str, set[str]] | None = None
+) -> str:
+    known = known or {}
+    keys = issue_keys(result)
     m = result.metrics
     lines = _header("Vault health")
+    if known:
+        lines += [
+            "Issues that existed when the ledger was adopted are folded under "
+            "*Known before adoption*; the rest appeared since.",
+            "",
+        ]
     lines += [
         "| metric | value |",
         "|---|---|",
@@ -58,36 +84,54 @@ def health_page(result: AuditResult, ratchet: RatchetResult) -> str:
         for c in ratchet.improvements:
             lines.append(f"- `{c.metric}` improved: {c.baseline:g} -> {c.current:g}")
         lines.append("")
-    sections: list[tuple[str, list[str]]] = [
+    stale_age = dict(result.lifecycle.stale)
+    sections: list[tuple[str, str, list[tuple[str, str]]]] = [
         (
             "Dangling links",
+            "dangling",
             [
-                f"{_link(d.source.as_posix())} -> `{d.target}`"
-                for d in result.graph.dangling
+                (k, f"{_link(d.source.as_posix())} -> `{d.target}`")
+                for k, d in zip(keys["dangling"], result.graph.dangling, strict=True)
             ],
         ),
-        ("Orphans (nothing links here)", [_link(p) for p in result.orphans]),
         (
-            "Merge candidates (one topic cut in half)",
-            [f"{_link(a)} + {_link(b)} (overlap {s:.0%})" for a, b, s in result.merges],
+            "Orphans (nothing links here)",
+            "orphans",
+            [(p, _link(p)) for p in result.orphans],
         ),
         (
             "Numbers without a source",
+            "unsourced",
             [
-                f"{_link(u.path.as_posix())}:{u.line} `{u.number}` - {u.context}"
-                for u in result.provenance.unsourced[:50]
+                (k, f"{_link(u.path.as_posix())}:{u.line} `{u.number}` - {u.context}")
+                for k, u in zip(
+                    keys["unsourced"], result.provenance.unsourced, strict=True
+                )
             ],
         ),
         (
             "No lifecycle declared",
-            [_link(p.as_posix()) for p in result.lifecycle.missing],
+            "lifecycle_missing",
+            [(p, _link(p)) for p in keys["lifecycle_missing"]],
         ),
         (
             "Living notes not verified recently",
+            "stale",
             [
-                f"{_link(p.as_posix())} ({'never' if age < 0 else f'{age} days'})"
-                for p, age in result.lifecycle.stale
+                (
+                    p.as_posix(),
+                    f"{_link(p.as_posix())} ({'never' if a < 0 else f'{a} days'})",
+                )
+                for p, a in stale_age.items()
             ],
+        ),
+    ]
+    for title, key, items in sections:
+        lines += _section(title, items, known.get(key, set()))
+    other: list[tuple[str, list[str]]] = [
+        (
+            "Merge candidates (one topic cut in half)",
+            [f"{_link(a)} + {_link(b)} (overlap {s:.0%})" for a, b, s in result.merges],
         ),
         (
             "Invalid frontmatter",
@@ -98,16 +142,18 @@ def health_page(result: AuditResult, ratchet: RatchetResult) -> str:
         ),
         ("Records modified after commit", [f"`{n}`" for n in result.integrity.rewritten]),
     ]
-    for title, items in sections:
+    for title, items in other:
         if items:
             lines += [f"## {title} ({len(items)})", "", *(f"- {i}" for i in items), ""]
     return "\n".join(lines)
 
 
-def write_health(result: AuditResult, ratchet: RatchetResult) -> Path:
+def write_health(
+    result: AuditResult, ratchet: RatchetResult, known: dict[str, set[str]] | None = None
+) -> Path:
     vault = result.corpus.vault
     folder = vault.folder("generated")
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / HEALTH_NAME
-    path.write_text(health_page(result, ratchet) + "\n", encoding="utf-8")
+    path.write_text(health_page(result, ratchet, known) + "\n", encoding="utf-8")
     return path

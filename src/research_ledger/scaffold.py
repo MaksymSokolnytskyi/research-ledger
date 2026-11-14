@@ -9,6 +9,9 @@ anything happens.
 * ``.ledger/`` -- machine state; suggested for ``.gitignore``.
 * Starter notes (``_home``, ``LEDGER``) and note templates -- only in a new vault, or
   with ``--with-notes``.
+* In an existing project every ledger folder lives under ``ledger/`` (records,
+  definitions, generated pages), so nothing mixes with the project's own ``logs/``,
+  ``docs/`` or ``templates/``. ``--docs docs notes`` limits which folders are read.
 * ``.obsidian/`` settings -- only if the folder has no ``.obsidian/`` yet. An existing
   vault keeps its own settings; the CSS snippet is added beside them, since a new
   file in ``snippets/`` changes nothing until it is switched on.
@@ -54,12 +57,38 @@ def _vault_files(language: Language) -> list[tuple[str, str]]:
     return out
 
 
+LEDGER_DIR = "ledger/"
+
+
+def render_config(
+    name: str, language: Language, prefix: str, docs: tuple[str, ...]
+) -> str:
+    """``ledger.toml`` text. ``docs`` limits scanning to those folders (plus ledger/)."""
+    if docs:
+        globs = [f"{d.strip('/')}/**/*.md" for d in docs] + [f"{prefix}**/*.md"]
+    else:
+        globs = ["**/*.md"]
+    include = "[" + ", ".join(f'"{g}"' for g in dict.fromkeys(globs)) + "]"
+    text = _template("ledger.toml")
+    replacements = {
+        "{name}": name,
+        "{language}": language,
+        "{prefix}": prefix,
+        "{include}": include,
+    }
+    for key, value in replacements.items():
+        text = text.replace(key, value)
+    return text
+
+
 def plan(
     root: Path,
     name: str,
     language: Language = "en",
     existing: bool | None = None,
     with_notes: bool | None = None,
+    docs: tuple[str, ...] = (),
+    obsidian_settings: bool | None = None,
 ) -> tuple[list[PlannedFile], list[str]]:
     """Files to create and notes for the user. Nothing is written here.
 
@@ -68,26 +97,46 @@ def plan(
     has_markdown = any(root.rglob("*.md")) if root.exists() else False
     existing = has_markdown if existing is None else existing
     with_notes = (not existing) if with_notes is None else with_notes
+    prefix = LEDGER_DIR if existing else ""
     today = date.today().isoformat()
     files: list[PlannedFile] = []
     notes: list[str] = []
 
-    config = _template("ledger.toml").replace('name = "my-research"', f'name = "{name}"')
-    config = config.replace('language = "en"', f'language = "{language}"')
+    config = render_config(name, language, prefix, docs)
     files.append(
         PlannedFile(path=root / CONFIG_NAME, content=config, reason="configuration")
     )
 
     if with_notes:
         for rel, text in _vault_files(language):
-            if not rel.startswith("templates/"):
+            if rel.startswith("templates/"):
+                if existing:
+                    continue  # an existing vault keeps its own templates
+            else:
                 text = text.replace("{today}", today).replace("{name}", name)
+                rel = prefix + rel
             files.append(
                 PlannedFile(path=root / rel, content=text, reason="starter note")
             )
 
     obsidian = root / ".obsidian"
-    if not obsidian.exists():
+    # A new vault gets Obsidian settings; an existing project only on request, since a
+    # code repository nobody opens in Obsidian should not grow a .obsidian/ folder.
+    make_settings = (not existing) if obsidian_settings is None else obsidian_settings
+    if obsidian.exists():
+        notes.append(
+            "Existing .obsidian/ kept as is. Enable the 'ledger' CSS snippet in "
+            "Settings -> Appearance -> CSS snippets if you want it."
+        )
+    if obsidian.exists() or make_settings:
+        files.append(
+            PlannedFile(
+                path=obsidian / "snippets" / "ledger.css",
+                content=_template("obsidian", "snippets", "ledger.css"),
+                reason="CSS snippet",
+            )
+        )
+    if make_settings and not obsidian.exists():
         for rel in (
             "app.json",
             "core-plugins.json",
@@ -102,18 +151,8 @@ def plan(
                     reason="Obsidian settings",
                 )
             )
-    else:
-        notes.append(
-            "Existing .obsidian/ kept as is. Enable the 'ledger' CSS snippet in "
-            "Settings -> Appearance -> CSS snippets if you want it."
-        )
-    files.append(
-        PlannedFile(
-            path=obsidian / "snippets" / "ledger.css",
-            content=_template("obsidian", "snippets", "ledger.css"),
-            reason="CSS snippet",
-        )
-    )
+    elif not obsidian.exists():
+        notes.append("No .obsidian/ created; add --obsidian to get the vault settings.")
 
     gitignore = root / ".gitignore"
     if (root / ".git").exists() and (
@@ -127,7 +166,10 @@ def plan(
             "and skills without editing it."
         )
     if existing:
-        notes.append("Existing project: the current audit becomes the ratchet baseline.")
+        notes.append(
+            "Existing project: ledger files go under ledger/, and the current audit "
+            "becomes the baseline (old issues are listed apart from new ones)."
+        )
     return [f for f in files if not f.path.exists()], notes
 
 

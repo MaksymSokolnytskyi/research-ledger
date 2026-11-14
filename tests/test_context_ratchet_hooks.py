@@ -10,7 +10,6 @@ from conftest import write
 from research_ledger.cli import main
 from research_ledger.config import find_vault
 from research_ledger.context import build_context
-from research_ledger.corpus import load_corpus
 from research_ledger.hooks import run_hook
 from research_ledger.ratchet import compare, load_baseline, record_pass
 from research_ledger.scaffold import apply, plan
@@ -28,19 +27,15 @@ def test_bm25_prefers_the_matching_document() -> None:
 
 
 def test_context_puts_named_entities_first_and_surfaces_lessons(demo) -> None:
-    pack = build_context(load_corpus(demo), "why do judge verdicts flip between runs")
+    pack = build_context(demo, "why do judge verdicts flip between runs")
     assert pack.items[0].path == "def/judge.md"
     assert "verdict-drift" in " ".join(i.path for i in pack.items)
-    failing = build_context(
-        load_corpus(demo), "run_pilot.py fails with connection refused"
-    )
+    failing = build_context(demo, "run_pilot.py fails with connection refused")
     assert "ollama serve" in failing.failures[0].excerpt
 
 
 def test_context_is_silent_when_nothing_matches(demo) -> None:
-    assert (
-        build_context(load_corpus(demo), "quarterly tax filing in Belize").render() == ""
-    )
+    assert build_context(demo, "quarterly tax filing in Belize").render() == ""
 
 
 def test_ratchet_tightens_flags_regressions_and_adopts(blank) -> None:
@@ -122,3 +117,17 @@ def test_failure_hooks_capture_then_recall(demo) -> None:
     recall = json.loads(run_hook("pre-bash", json.dumps({**fail, "error": None})))
     assert "x2" in recall["hookSpecificOutput"]["additionalContext"]
     assert find_vault(demo.root).root == demo.root
+
+
+def test_postings_score_exactly_like_bm25() -> None:
+    from collections import Counter
+
+    from research_ledger.search import Postings
+
+    docs = ["judge cache hit rate", "cache cache prompt hash", "weather in Kyiv", ""]
+    plain = BM25(docs)
+    fast = Postings.build([Counter(tokenize(d)) for d in docs])
+    for query in ("cache judge", "prompt hash cache", "nothing here"):
+        assert [(i, round(s, 9)) for i, s in fast.rank(query)] == [
+            (i, round(s, 9)) for i, s in plain.rank(query)
+        ]

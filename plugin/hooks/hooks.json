@@ -2,16 +2,50 @@
   "description": "research-ledger: context intake, failure recall and capture. Silent outside a ledger and when there is nothing to add.",
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "ledger hook session-start", "timeout": 20 } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v ledger >/dev/null 2>&1; then ledger hook session-start; else echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"research-ledger: the plugin is installed but the `ledger` command is not on PATH, so its hooks are off. Tell the user and offer /research-ledger:onboard to install it.\"}}'; fi",
+            "timeout": 20
+          }
+        ]
+      }
     ],
     "UserPromptSubmit": [
-      { "hooks": [ { "type": "command", "command": "ledger hook user-prompt", "timeout": 20 } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v ledger >/dev/null 2>&1 && ledger hook user-prompt || true",
+            "timeout": 20
+          }
+        ]
+      }
     ],
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "ledger hook pre-bash", "timeout": 10 } ] }
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v ledger >/dev/null 2>&1 && ledger hook pre-bash || true",
+            "timeout": 10
+          }
+        ]
+      }
     ],
     "PostToolUseFailure": [
-      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "ledger hook tool-failure", "timeout": 20 } ] }
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v ledger >/dev/null 2>&1 && ledger hook tool-failure || true",
+            "timeout": 20
+          }
+        ]
+      }
     ]
   }
 }

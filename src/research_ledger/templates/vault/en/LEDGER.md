@@ -50,7 +50,7 @@ check, because a report is not evidence about the corpus it reports on.
 
 ## 7. What happened is kept apart from what is true
 
-Notes hold current truth and are edited freely. Records in `logs/` hold history and
+Notes hold current truth and are edited freely. Records in `records/` hold history and
 are **never edited**: a correction is a new record that references the old one.
 *Check: records modified after commit.*
 

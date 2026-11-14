@@ -44,7 +44,7 @@ def test_lifecycle_missing_stale_and_closed(blank) -> None:
     write(blank.root, "b.md", "---\nlifecycle: living\nlast_verified: 2026-01-01\n---\n")
     write(blank.root, "c.md", "---\nlifecycle: closed\n---\n")
     write(blank.root, "archive/d.md", "---\nlifecycle: closed\n---\n")
-    write(blank.root, "logs/2026-01-01_main_run_x_101010.md", "# record\n")
+    write(blank.root, "records/2026-01-01_main_run_x_101010.md", "# record\n")
     report = lifecycle(load_corpus(blank), today=date(2026, 3, 1))
     assert [p.name for p in report.missing] == ["a.md"]
     assert [(p.name, age) for p, age in report.stale] == [("b.md", 59)]

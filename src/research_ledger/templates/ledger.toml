@@ -1,35 +1,39 @@
 # research-ledger configuration. Every key is optional; defaults are shown.
 # Docs: https://github.com/MaksymSokolnytskyi/research-ledger
 
-name = "my-research"
-language = "en"            # "en" or "uk": language of the vault templates
+name = "{name}"
+language = "{language}"            # "en" or "uk": language of the vault templates
 agents = ["main"]          # callsigns of agents/stations that write records
 entry_points = ["_home", "README", "index"]   # notes nobody needs to link to
 stale_after_days = 30      # living notes must be re-verified this often
 
 # Which files are notes. Paths are relative to this file.
-include = ["**/*.md"]
-exclude = [".obsidian/**", "templates/**", ".ledger/**", ".git/**", "node_modules/**", ".venv/**", "**/__pycache__/**"]
+include = {include}
+exclude = [".obsidian/**", "templates/**", ".ledger/**", "**/.git/**", "**/node_modules/**", "**/.venv/**", "**/venv/**", "**/site-packages/**", "**/__pycache__/**"]
 
 [folders]
-definitions = "def"        # one note per defined entity
-atlas = "atlas"            # generated entity pages
-tasks = "tasks"
-records = "logs"           # append-only records (runs, failures, lessons, agent calls)
-registry = "registry"      # claims, failures, predictions
-generated = "_generated"   # other generated pages (_health)
-archive = "archive"
+definitions = "{prefix}def"          # one note per defined entity
+records = "{prefix}records"          # append-only records (runs, failures, lessons)
+generated = "{prefix}_generated"     # pages written by `ledger audit`
+archive = "{prefix}archive"
 
 [capture]                  # automatic failure memory from Claude Code hooks
 enabled = true
 redact = true              # mask API keys, tokens, passwords and home paths
 extra_secret_patterns = [] # more regexes to mask
 max_output_chars = 4000
+# Commands whose non-zero exit is an answer, not a mistake (grep with no match, test, diff ...).
+# Uncomment to replace the built-in list:
+# ignore_commands = ["grep", "rg", "test", "diff", "which", "ls", "find", "git diff", "git status"]
 
 [context]                  # task-context packs
-budget_tokens = 3000
+budget_tokens = 3000       # for `ledger context`
+prompt_budget_tokens = 700 # for the pack attached to each Claude Code prompt
+prompt_max_notes = 3
+prompt_relative_cutoff = 0.5   # on prompts, keep notes scoring >= this share of the best
 min_score = 1.5            # below this BM25 score a note is not relevant
-inject_on_prompt = true    # attach a pack to Claude Code prompts when relevant
+inject = "relevant"        # "relevant": when any note matches; "named": only when the prompt names
+                           # a vault entity or known failure; "off": never
 
 [ratchet]                  # metrics that may improve and may not get worse
 guarded = ["dangling_links", "orphans", "numbers_unsourced_per_1k_words", "lifecycle_missing", "repeat_failure_rate"]

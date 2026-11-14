@@ -17,7 +17,7 @@ description: Run the research-ledger audit, explain what got worse, and fix the 
       in the text instead of inventing one);
    4. orphans (link from the note that should lead here, or archive);
    5. missing lifecycle.
-4. Never change a number to make a check pass, and never edit `logs/` records.
+4. Never change a number to make a check pass, and never edit records (the `records/` folder, or `ledger/records/` in an adopted project).
 5. Run `ledger audit` (without `--check`) to record the pass. If a regression is
    deliberate, explain why in a `ledger record decision ...` and only then run
    `ledger audit --adopt`.

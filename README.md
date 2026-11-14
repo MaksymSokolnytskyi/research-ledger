@@ -18,8 +18,12 @@ what it maintains. research-ledger treats a vault like a codebase under CI:
 - **quality can only go up**: guarded metrics are compared with a baseline that only
   moves in the good direction.
 
-It works on a new vault and on an existing project: `init` never overwrites a file, and
-existing debt becomes the starting baseline instead of a wall of errors.
+It works on a new vault and on an existing project: `init` never overwrites a file,
+keeps everything it adds under one `ledger/` folder, and turns existing debt into the
+starting baseline instead of a wall of errors. Everything runs locally; nothing is sent
+anywhere.
+
+> **Closed beta.** Testers: start with [docs/BETA_UK.md](docs/BETA_UK.md).
 
 ## Install
 
@@ -41,9 +45,14 @@ followed by `claude plugin install research-ledger@research-ledger`.
 ```bash
 ledger init my-research --language en        # new vault (or --language uk)
 ledger init . --existing --dry-run           # preview on an existing project
-ledger init . --existing                     # adopt: current state = baseline
-ledger audit                                 # checks + ratchet + _generated/_health.md
+ledger init . --existing --docs docs notes   # adopt; read only these folders
+ledger audit                                 # checks + ratchet + health page
 ```
+
+In an existing project the ledger's own folders live under `ledger/` (`ledger/records`,
+`ledger/def`, `ledger/_generated`), so they never mix with the project's `logs/` or
+`docs/`. The health page lists issues that appeared since adoption first and folds the
+adopted ones away.
 
 Open the folder in Obsidian. The `examples/demo-vault` folder shows every check with
 one planted problem of each kind:
@@ -71,11 +80,14 @@ paragraph; one recorded failure (`run_pilot.py`: connection refused) has its les
 | hook | what it does | when it speaks |
 |---|---|---|
 | `SessionStart` | three-line brief: vault size, failures with no lesson | in a ledger |
-| `UserPromptSubmit` | **task-context intake**: the prompt becomes a query; matching notes and known failures are attached | only if something clears the relevance threshold |
+| `UserPromptSubmit` | **task-context intake**: the prompt becomes a query; matching notes and known failures are attached | per `context.inject`: `relevant` (default), `named` (only when the prompt names a vault entity), `off` |
 | `PreToolUse` (Bash) | known failures of the same command, with lessons | only if the command failed before |
-| `PostToolUseFailure` (Bash) | captures the failure (redacted), detects repeats | on failure |
+| `PostToolUseFailure` (Bash) | captures the failure (redacted); repeats are counted, not copied | on failure; `grep` with no match, `test`, `diff` and similar are ignored |
 
-Skills: `/research-ledger:ledger` (rules), `:audit`, `:onboard`, `:record`.
+The index behind context packs is cached per file in `.ledger/`; a warm hook call takes
+about 0.25-0.35 s end to end on vaults from 100 to 3,000 notes, most of it Python start-up.
+
+Skills: `/research-ledger:ledger` (rules), `:audit`, `:onboard`, `:record`, `:feedback`.
 
 The same functions are available as commands:
 
@@ -86,8 +98,19 @@ ledger capture --command "pytest -q" --error - < err.txt
 ledger lesson <failure-id> "start ollama serve before the pilot"
 ledger failures --command "python run_pilot.py"
 ledger serve                                  # live HTML/JS pages for <iframe> embeds
+ledger stats                                  # what the hooks did here (local only)
+ledger feedback --kind bug -m "..."           # report with diagnostics; you decide to send
 ledger doctor
 ```
+
+## Switching things off
+
+| what | how |
+|---|---|
+| everything in Claude Code | `/plugin disable research-ledger` |
+| context added to prompts | `[context] inject = "off"` (or `"named"` for quieter) |
+| failure capture | `[capture] enabled = false` |
+| remove from a project | delete `ledger.toml`, `ledger/` and `.ledger/` |
 
 ## The checks
 
@@ -97,7 +120,7 @@ ledger doctor
 | `orphans` | notes nothing links to (records and entry points exempt) | yes |
 | `numbers_unsourced_per_1k_words` | numbers with no link, URL or footnote in their paragraph or table row, and no `runs:`/`sources:` header | yes |
 | `lifecycle_missing` | notes that do not declare `living` / `snapshot` / `closed` | yes |
-| `repeat_failure_rate` | share of failures that happened again after a lesson existed: does the vault learn? | yes |
+| `repeat_failure_rate` | share of failure events that happened after a lesson existed: does the vault learn? | yes |
 | `lifecycle_stale` | living notes not verified within `stale_after_days` | |
 | `merge_candidates` | mutually linked notes sharing most neighbours: one topic cut in half | |
 | `records_rewritten` | append-only records modified after commit (from git) | |

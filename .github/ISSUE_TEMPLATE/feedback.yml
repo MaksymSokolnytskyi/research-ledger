@@ -1,0 +1,15 @@
+name: Comment or advice
+description: Anything else - what felt useful, noisy, confusing or surprising
+labels: [feedback]
+body:
+  - type: textarea
+    id: comment
+    attributes:
+      label: Your comment
+    validations:
+      required: true
+  - type: dropdown
+    id: noise
+    attributes:
+      label: How did the context Claude received from the ledger feel?
+      options: ["useful", "sometimes useful", "noise", "did not notice it"]

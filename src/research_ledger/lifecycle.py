@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from research_ledger.corpus import Corpus
+from research_ledger.corpus import Corpus, in_folder
 
 
 class LifecycleReport(BaseModel):
@@ -44,7 +44,7 @@ def lifecycle(corpus: Corpus, today: date | None = None) -> LifecycleReport:
     for note in corpus.notes:
         if note.frontmatter_error:
             invalid.append((note.path, note.frontmatter_error))
-        if note.generated or note.path.parts[:1] == (records,):
+        if note.generated or in_folder(note.path, records):
             continue
         fm = note.frontmatter
         if fm.lifecycle is None:
@@ -56,7 +56,7 @@ def lifecycle(corpus: Corpus, today: date | None = None) -> LifecycleReport:
                 age = (today - fm.last_verified).days
                 if age > cfg.stale_after_days:
                     stale.append((note.path, age))
-        elif fm.lifecycle == "closed" and archive not in note.path.parts:
+        elif fm.lifecycle == "closed" and not in_folder(note.path, archive):
             closed.append(note.path)
     return LifecycleReport(
         missing=tuple(missing),

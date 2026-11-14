@@ -23,18 +23,17 @@ Language = Literal["en", "uk"]
 
 
 class Folders(BaseModel):
-    """Vault-relative folders with a fixed meaning."""
+    """Vault-relative folders with a fixed meaning.
+
+    ``ledger init --existing`` puts all of them under one ``ledger/`` folder, so the
+    ledger never mixes its files with a project's own ``logs/`` or ``docs/``.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     definitions: str = Field(default="def", description="One note per defined entity.")
-    atlas: str = Field(default="atlas", description="Generated entity pages.")
-    tasks: str = "tasks"
-    records: str = Field(default="logs", description="Append-only records.")
-    registry: str = Field(
-        default="registry", description="Claims, failures, predictions."
-    )
-    generated: str = Field(default="_generated", description="Other generated pages.")
+    records: str = Field(default="records", description="Append-only records.")
+    generated: str = Field(default="_generated", description="Generated pages.")
     archive: str = "archive"
 
 
@@ -51,6 +50,33 @@ class Capture(BaseModel):
         default=(), description="Additional regexes whose matches are masked."
     )
     max_output_chars: int = Field(default=4000, ge=200)
+    ignore_commands: tuple[str, ...] = Field(
+        default=(
+            "grep",
+            "egrep",
+            "fgrep",
+            "rg",
+            "ag",
+            "test",
+            "[",
+            "diff",
+            "cmp",
+            "which",
+            "where",
+            "command",
+            "type",
+            "ls",
+            "find",
+            "pgrep",
+            "pidof",
+            "git diff",
+            "git grep",
+            "git status",
+            "git log",
+            "git show",
+        ),
+        description="Commands whose non-zero exit is an answer, not a mistake.",
+    )
 
 
 class Context(BaseModel):
@@ -58,13 +84,24 @@ class Context(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    budget_tokens: int = Field(default=3000, ge=200)
+    budget_tokens: int = Field(default=3000, ge=200, description="`ledger context`.")
+    prompt_budget_tokens: int = Field(
+        default=700, ge=100, description="Pack attached to each Claude Code prompt."
+    )
+    prompt_max_notes: int = Field(default=3, ge=1)
+    prompt_relative_cutoff: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+        description="On prompts, keep notes scoring at least this share of the best one.",
+    )
     min_score: float = Field(
         default=1.5, ge=0, description="Below this BM25 score a note is not relevant."
     )
-    inject_on_prompt: bool = Field(
-        default=True,
-        description="Add a context pack to Claude Code prompts when relevant.",
+    inject: Literal["relevant", "named", "off"] = Field(
+        default="relevant",
+        description="relevant: attach a pack when any note matches; named: only when "
+        "the prompt names a vault entity or a known failure; off: never.",
     )
 
 
@@ -94,9 +131,9 @@ class LedgerConfig(BaseModel):
         ".obsidian/**",
         "templates/**",
         ".ledger/**",
-        ".git/**",
-        "node_modules/**",
-        ".venv/**",
+        "**/.git/**",
+        "**/node_modules/**",
+        "**/.venv/**",
         "**/__pycache__/**",
     )
     entry_points: tuple[str, ...] = Field(

@@ -26,11 +26,13 @@ import contextlib
 import json
 import os
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from research_ledger.config import CONFIG_NAME, Vault, find_vault
+from research_ledger.usage import log_event
 
 EVENT_NAMES = {
     "session-start": "SessionStart",
@@ -51,15 +53,15 @@ def _vault_for(payload: dict[str, Any]) -> Vault | None:
 
 
 def on_session_start(vault: Vault, payload: dict[str, Any]) -> str:
-    from research_ledger.corpus import load_corpus
-    from research_ledger.failures import load_index
+    from research_ledger.failures import load_failures
+    from research_ledger.index import load_index
 
-    corpus = load_corpus(vault)
-    index = load_index(vault)
+    notes = len(load_index(vault).notes)  # also warms the cache for the first prompt
+    index = load_failures(vault)
     open_failures = [f for s, f in index.failures.items() if not index.lessons_for(s)]
     lines = [
         f"This folder is a research ledger ({vault.config.name}): "
-        f"{len(corpus.notes)} notes. Numbers need a source; records in "
+        f"{notes} notes. Numbers need a source; records in "
         f"`{vault.config.folders.records}/` are append-only.",
         'Use `ledger context "<task>"` for background and '
         '`ledger lesson <failure-id> "..."` after fixing a recorded failure.',
@@ -71,15 +73,9 @@ def on_session_start(vault: Vault, payload: dict[str, Any]) -> str:
 
 
 def on_user_prompt(vault: Vault, payload: dict[str, Any]) -> str:
-    if not vault.config.context.inject_on_prompt:
-        return ""
-    prompt = str(payload.get("prompt", "")).strip()
-    if len(prompt) < 12:
-        return ""
-    from research_ledger.context import build_context
-    from research_ledger.corpus import load_corpus
+    from research_ledger.context import pack_for_prompt
 
-    return build_context(load_corpus(vault), prompt).render()
+    return pack_for_prompt(vault, str(payload.get("prompt", "")))
 
 
 def on_pre_bash(vault: Vault, payload: dict[str, Any]) -> str:
@@ -135,12 +131,17 @@ HANDLERS: dict[str, Callable[[Vault, dict[str, Any]], str]] = {
 
 def run_hook(event: str, stdin: str) -> str:
     """Return the JSON to print (or ``""``). Raises nothing."""
+    vault: Vault | None = None
+    started = time.perf_counter()
     try:
         payload = json.loads(stdin) if stdin.strip() else {}
         vault = _vault_for(payload)
         if vault is None or event not in HANDLERS:
             return ""
         context = HANDLERS[event](vault, payload)
+        log_event(
+            vault, event, (time.perf_counter() - started) * 1000, len(context), "ok"
+        )
         if not context:
             return ""
         return json.dumps(
@@ -154,6 +155,8 @@ def run_hook(event: str, stdin: str) -> str:
         )
     except Exception as exc:  # a hook must never break the turn
         _log_error(event, exc)
+        if vault is not None:
+            log_event(vault, event, (time.perf_counter() - started) * 1000, 0, "error")
         return ""
 
 

@@ -1,0 +1,20 @@
+name: Bug
+description: Something broke, behaved wrongly, or got in the way
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce (commands, prompt, folder layout)
+  - type: textarea
+    id: diag
+    attributes:
+      label: Diagnostics
+      description: Paste the output of `ledger feedback --kind bug -m "..."` (or `ledger doctor` and `ledger stats`).
+      render: markdown

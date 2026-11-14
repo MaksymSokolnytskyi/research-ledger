@@ -1,0 +1,14 @@
+name: Idea or wish
+description: Something you would like the ledger to do, or do differently
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like, and the situation where you missed it
+    validations:
+      required: true
+  - type: textarea
+    id: now
+    attributes:
+      label: What you do today instead

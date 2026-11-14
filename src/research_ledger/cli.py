@@ -31,6 +31,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         language=args.language,
         existing=True if args.existing else None,
         with_notes=True if args.with_notes else None,
+        docs=tuple(args.docs or ()),
+        obsidian_settings=True if args.obsidian else None,
     )
     for f in files:
         print(f"  create {f.path.relative_to(root)}  ({f.reason})")
@@ -40,18 +42,20 @@ def cmd_init(args: argparse.Namespace) -> int:
         return 0
     apply(files)
     vault = find_vault(root)
-    if any(n.startswith("Existing project") for n in notes):
-        from research_ledger.audit import run_audit
+    if any(n.startswith("Existing project") for n in notes):  # adopt current state
+        from research_ledger.audit import run_audit, save_adopted
         from research_ledger.ratchet import record_pass
 
-        record_pass(vault, run_audit(vault).metrics, adopt=True)
+        result = run_audit(vault)
+        record_pass(vault, result.metrics, adopt=True)
+        save_adopted(vault, result)
         print("  baseline adopted from the current state")
     print(f"ledger ready at {root}")
     return 0
 
 
 def cmd_audit(args: argparse.Namespace) -> int:
-    from research_ledger.audit import run_audit
+    from research_ledger.audit import load_adopted, run_audit, save_adopted
     from research_ledger.generate import write_health
     from research_ledger.ratchet import compare, record_pass, stalled
 
@@ -82,7 +86,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
             print(f"stalled: {metric} has not improved in 10 passes")
     if not args.check:
         record_pass(vault, metrics, adopt=args.adopt)
-        page = write_health(result, ratchet)
+        if args.adopt:
+            save_adopted(vault, result)
+        page = write_health(result, ratchet, load_adopted(vault))
         if not args.json:
             print(f"wrote {page.relative_to(vault.root)}")
     return 1 if ratchet.regressions and not args.adopt else 0
@@ -90,10 +96,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
 def cmd_context(args: argparse.Namespace) -> int:
     from research_ledger.context import build_context
-    from research_ledger.corpus import load_corpus
 
     vault = find_vault(Path(args.path))
-    pack = build_context(load_corpus(vault), args.task, args.budget)
+    pack = build_context(vault, args.task, args.budget)
     print(pack.render() or "nothing in the ledger matches this task")
     return 0
 
@@ -125,7 +130,7 @@ def cmd_capture(args: argparse.Namespace) -> int:
     error = sys.stdin.read() if args.error == "-" else args.error
     result = capture(vault, args.tool, args.command, error, agent=args.agent or "main")
     if result is None:
-        print("capture is disabled in ledger.toml")
+        print("not recorded: capture is off in ledger.toml or the command is ignored")
         return 0
     print(f"{'repeat of' if result.repeat else 'new failure'} {result.record_id}")
     for lesson in result.lessons:
@@ -137,12 +142,16 @@ def cmd_lesson(args: argparse.Namespace) -> int:
     from research_ledger.failures import add_lesson
 
     vault = find_vault(Path(args.path))
-    print(add_lesson(vault, args.failure_id, args.text, agent=args.agent or "main"))
+    try:
+        print(add_lesson(vault, args.failure_id, args.text, agent=args.agent or "main"))
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}", file=sys.stderr)
+        return 2
     return 0
 
 
 def cmd_failures(args: argparse.Namespace) -> int:
-    from research_ledger.failures import known_failures, load_index
+    from research_ledger.failures import known_failures, load_failures
 
     vault = find_vault(Path(args.path))
     if args.command:
@@ -151,9 +160,9 @@ def cmd_failures(args: argparse.Namespace) -> int:
             for lesson in k.lessons:
                 print(f"    lesson: {lesson}")
         return 0
-    index = load_index(vault)
+    index = load_failures(vault)
     for sig, rec in index.failures.items():
-        times = 1 + len(index.occurrences.get(sig, []))
+        times = index.count(sig)
         lessons = index.lessons_for(sig)
         print(f"{rec.id}  x{times}  {'lesson' if lessons else 'NO LESSON'}  {rec.title}")
     return 0
@@ -179,6 +188,29 @@ def cmd_serve(args: argparse.Namespace) -> int:
         )
         with contextlib.suppress(KeyboardInterrupt):
             server.serve_forever()
+    return 0
+
+
+def cmd_feedback(args: argparse.Namespace) -> int:
+    from research_ledger.feedback import main_feedback
+
+    vault = find_vault(Path(args.path))
+    message = sys.stdin.read() if args.message == "-" else (args.message or "")
+    return main_feedback(vault, args.kind, message, args.submit)
+
+
+def cmd_stats(args: argparse.Namespace) -> int:
+    from research_ledger.usage import summary
+
+    stats = summary(find_vault(Path(args.path)))
+    if not stats:
+        print("no hook activity recorded yet")
+    for event, s in stats.items():
+        print(
+            f"{event:<14} calls {s['calls']:>5}  spoke {s['spoke']:>5}  "
+            f"median {s['median_ms']:>6} ms  p95 {s['p95_ms']:>6} ms  "
+            f"errors {s['errors']}  chars added {s['chars_added']}"
+        )
     return 0
 
 
@@ -220,6 +252,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--existing", action="store_true", help="treat as an existing project"
     )
     sp.add_argument("--with-notes", action="store_true", help="add starter notes anyway")
+    sp.add_argument(
+        "--docs", nargs="+", help="only read these folders: --docs docs notes"
+    )
+    sp.add_argument(
+        "--obsidian", action="store_true", help="add Obsidian settings anyway"
+    )
     sp.add_argument("--dry-run", action="store_true")
 
     sp = add("audit", cmd_audit, "run all checks and the ratchet")
@@ -263,6 +301,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("serve", cmd_serve, "serve the vault for embedded HTML/JS pages")
     sp.add_argument("--port", type=int, default=8765)
 
+    sp = add("feedback", cmd_feedback, "bug report or idea with diagnostics attached")
+    sp.add_argument("--kind", choices=["bug", "idea", "comment"], default="comment")
+    sp.add_argument("--message", "-m", help="text, or - for stdin")
+    sp.add_argument("--submit", action="store_true", help="file it with your gh login")
+
+    add("stats", cmd_stats, "what the hooks did on this machine (local only)")
     add("doctor", cmd_doctor, "check the installation and configuration")
     return p
 

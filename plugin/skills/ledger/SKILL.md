@@ -12,7 +12,7 @@ A folder with `ledger.toml` is a research ledger: Markdown notes kept trustworth
    the same paragraph or table row, or list it under `runs:` / `sources:` in the
    frontmatter. Never type a number from memory.
 2. **Claims about code name a test** in `checks:` (`tests/test_x.py::test_y`).
-3. **Records in the records folder (default `logs/`) are append-only.** Never edit or
+3. **Records (folder `records/`, or `ledger/records/` in an adopted project) are append-only.** Never edit or
    delete one. To correct a record, write a new one with `--ref <old-id>`.
 4. **Generated pages** (`generated: true` in frontmatter) are rewritten by tools. Do
    not edit them; change their source and run `ledger audit`.

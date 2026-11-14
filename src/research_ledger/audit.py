@@ -8,13 +8,14 @@ interface.
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 from pydantic import BaseModel, ConfigDict
 
 from research_ledger.config import Vault
 from research_ledger.corpus import Corpus, load_corpus
-from research_ledger.failures import load_index, repeat_failure_rate
+from research_ledger.failures import load_failures, repeat_failure_rate
 from research_ledger.graph import LinkGraph, build_graph, merge_candidates, orphans
 from research_ledger.lifecycle import LifecycleReport, lifecycle
 from research_ledger.provenance import ProvenanceReport, provenance
@@ -63,7 +64,7 @@ class AuditResult(BaseModel):
 def run_audit(vault: Vault, today: date | None = None) -> AuditResult:
     corpus = load_corpus(vault)
     graph = build_graph(corpus)
-    index = load_index(vault)
+    index = load_failures(vault)
     without_lesson = sum(1 for sig in index.failures if not index.lessons_for(sig))
     return AuditResult(
         corpus=corpus,
@@ -79,3 +80,40 @@ def run_audit(vault: Vault, today: date | None = None) -> AuditResult:
         failures_without_lesson=without_lesson,
         repeat_failure_rate=repeat_failure_rate(vault),
     )
+
+
+ADOPTED_FILE = "adopted.json"
+
+
+def issue_keys(result: AuditResult) -> dict[str, list[str]]:
+    """Stable identities of individual issues, so a later audit can tell new from old.
+
+    Line numbers are left out of the keys on purpose: editing above an old issue
+    must not make it look new.
+    """
+    return {
+        "dangling": [f"{d.source.as_posix()}->{d.target}" for d in result.graph.dangling],
+        "orphans": list(result.orphans),
+        "unsourced": [
+            f"{u.path.as_posix()}|{u.number}|{u.context}"
+            for u in result.provenance.unsourced
+        ],
+        "lifecycle_missing": [p.as_posix() for p in result.lifecycle.missing],
+        "stale": [p.as_posix() for p, _ in result.lifecycle.stale],
+    }
+
+
+def save_adopted(vault: Vault, result: AuditResult) -> None:
+    """Remember today's issues as known debt (``init --existing`` / ``audit --adopt``)."""
+    vault.state_dir.mkdir(parents=True, exist_ok=True)
+    (vault.state_dir / ADOPTED_FILE).write_text(
+        json.dumps(issue_keys(result), ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+
+
+def load_adopted(vault: Vault) -> dict[str, set[str]]:
+    try:
+        data = json.loads((vault.state_dir / ADOPTED_FILE).read_text(encoding="utf-8"))
+        return {k: set(v) for k, v in data.items()}
+    except (OSError, ValueError, AttributeError):
+        return {}

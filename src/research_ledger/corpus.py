@@ -7,10 +7,10 @@ disagree about the graph they are looking at.
 
 from __future__ import annotations
 
-import fnmatch
+import os
 import re
 from datetime import date
-from functools import cached_property
+from functools import cached_property, lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,6 +20,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from research_ledger.config import Vault
 
 Lifecycle = Literal["living", "snapshot", "closed"]
+
+# libyaml's loader is an order of magnitude faster when available; same semantics.
+_YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*(?:\n|\Z)", re.DOTALL)
 _FENCE_RE = re.compile(r"^(```|~~~).*?^\1", re.DOTALL | re.MULTILINE)
@@ -117,6 +120,16 @@ def strip_blocks(text: str) -> str:
     return _MATH_BLOCK_RE.sub(_blank, _FENCE_RE.sub(_blank, text))
 
 
+def in_folder(path: Path | str, folder: str) -> bool:
+    """True if vault-relative ``path`` lies inside vault-relative ``folder``.
+
+    Single source of truth for folder membership: folders may be nested
+    (``ledger/records``), so comparing only the first path segment is wrong.
+    """
+    posix = path.as_posix() if isinstance(path, Path) else path
+    return (posix + "/").startswith(folder.strip("/") + "/")
+
+
 def strip_code(text: str) -> str:
     """Remove fenced blocks, display math and inline code, keeping line structure."""
     return _INLINE_CODE_RE.sub(" ", strip_blocks(text))
@@ -129,7 +142,7 @@ def split_frontmatter(text: str) -> tuple[dict[str, Any], str, str | None]:
         return {}, text, None
     body = text[match.end() :]
     try:
-        data = yaml.safe_load(match.group(1)) or {}
+        data = yaml.load(match.group(1), Loader=_YAML_LOADER) or {}
     except yaml.YAMLError as exc:
         return {}, body, f"invalid YAML: {exc}".splitlines()[0]
     if not isinstance(data, dict):
@@ -167,22 +180,68 @@ def parse_links(body: str) -> tuple[Link, ...]:
     return tuple(links)
 
 
-def _matches(path: str, patterns: tuple[str, ...]) -> bool:
-    return any(
-        fnmatch.fnmatch(path, p) or fnmatch.fnmatch("/" + path, "*/" + p)
-        for p in patterns
-    )
+def glob_to_regex(pattern: str) -> str:
+    """Translate a vault glob to a regex with gitignore-like semantics.
+
+    ``*`` and ``?`` stay inside one folder, ``**`` crosses folders, and ``**/`` also
+    matches zero folders, so ``docs/**/*.md`` matches ``docs/guide.md``.
+    """
+    out, i = [], 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out.append("(?:.*/)?")
+            i += 3
+        elif pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return "".join(out)
+
+
+@lru_cache(maxsize=64)
+def _compile(patterns: tuple[str, ...]) -> re.Pattern[str]:
+    return re.compile("|".join(f"(?:{glob_to_regex(p)})\\Z" for p in patterns) or "(?!)")
+
+
+def _dir_excluded(rel_dir: str, exclude: re.Pattern[str]) -> bool:
+    """A folder is skipped when anything inside it would be excluded (``x/**``)."""
+    return bool(exclude.match(rel_dir + "/__probe__"))
 
 
 def iter_note_paths(vault: Vault) -> list[Path]:
+    """Vault-relative note paths, sorted.
+
+    Walks with ``os.walk`` and prunes excluded folders before descending, so a code
+    repository's ``.git`` or ``node_modules`` costs nothing however large it is.
+    """
     cfg = vault.config
-    found: set[Path] = set()
-    for pattern in cfg.include:
-        for path in vault.root.glob(pattern):
-            rel = path.relative_to(vault.root)
-            if path.is_file() and not _matches(rel.as_posix(), cfg.exclude):
-                found.add(rel)
-    return sorted(found)
+    include = _compile(cfg.include)
+    exclude = _compile(cfg.exclude)
+    root = str(vault.root)
+    found: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel_dir = os.path.relpath(dirpath, root).replace(os.sep, "/")
+        rel_dir = "" if rel_dir == "." else rel_dir
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if not _dir_excluded(f"{rel_dir}/{d}".lstrip("/"), exclude)
+        ]
+        for name in filenames:
+            if not name.endswith(".md"):
+                continue
+            rel = f"{rel_dir}/{name}" if rel_dir else name
+            if include.match(rel) and not exclude.match(rel):
+                found.append(rel)
+    return [Path(p) for p in sorted(found)]
 
 
 def read_note(vault: Vault, rel: Path) -> Note:

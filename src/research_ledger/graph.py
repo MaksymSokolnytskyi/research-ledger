@@ -15,7 +15,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from research_ledger.corpus import Corpus
+from research_ledger.corpus import Corpus, in_folder
 
 MERGE_JACCARD = 0.6
 MERGE_MIN_NEIGHBOURS = 3
@@ -78,7 +78,7 @@ def orphans(corpus: Corpus, graph: LinkGraph) -> list[Path]:
         for path in graph.edges
         if not inbound.get(path)
         and path.stem.lower() not in entry
-        and path.parts[:1] != (records,)
+        and not in_folder(path, records)
     )
 
 

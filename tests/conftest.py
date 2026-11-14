@@ -14,7 +14,7 @@ DEMO = Path(__file__).resolve().parents[1] / "examples" / "demo-vault"
 def demo(tmp_path: Path) -> Vault:
     """A writable copy of the demo vault."""
     target = tmp_path / "demo"
-    shutil.copytree(DEMO, target)
+    shutil.copytree(DEMO, target, ignore=shutil.ignore_patterns(".ledger", "_generated"))
     return find_vault(target)
 
 

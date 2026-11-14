@@ -45,5 +45,5 @@ opens ordinary links (including `http://127.0.0.1:8765/...`) in an Obsidian tab.
 ## Syncing across machines
 
 Records are one file per event with collision-free names, so two machines never write
-the same file. Generated pages (`_generated/`, `atlas/`) are rewritten by `ledger
+the same file. Generated pages (`_generated/`) are rewritten by `ledger
 audit`; let one machine regenerate them, or exclude them from sync, to avoid conflicts.
