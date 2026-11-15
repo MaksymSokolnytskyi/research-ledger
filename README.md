@@ -146,7 +146,7 @@ writes into the vault.
 
 Origin: extracted and generalised from the documentation tooling of a research project
 (32 scripts, about 7,000 lines, tied to one vault and two agents). See
-[docs/ROADMAP.md](docs/ROADMAP.md) for what comes next and [docs/OBSIDIAN.md](docs/OBSIDIAN.md)
+[docs/ROADMAP.md](docs/ROADMAP.md) for what comes next, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the target architecture and [docs/OBSIDIAN.md](docs/OBSIDIAN.md)
 for themes and live pages.
 
 ## Development

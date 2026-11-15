@@ -11,6 +11,9 @@ templates, demo vault.
 
 ## Next
 
+The target these items serve is the learning loop in
+[ARCHITECTURE.md](ARCHITECTURE.md): a hint is judged by its consequence.
+
 1. **Research agents with provenance.** A provider interface with adapters for
    Perplexity (web search with citations), Gemini (long-context reading of a corpus),
    Anthropic and any OpenAI-compatible server (including Ollama). Keys come from the
