@@ -155,7 +155,8 @@ def parse_links(body: str) -> tuple[Link, ...]:
     text = strip_code(body)
     links: list[Link] = []
     for m in _WIKILINK_RE.finditer(text):
-        target = m.group(1).strip()
+        # inside a Markdown table Obsidian writes [[note\|alias]]: drop the escape
+        target = m.group(1).strip().removesuffix("\\").strip()
         if target:
             links.append(
                 Link(

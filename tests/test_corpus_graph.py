@@ -64,3 +64,11 @@ def test_merge_candidates_find_one_topic_cut_in_half(blank) -> None:
     write(blank.root, "b.md", "[[a]] [[x]] [[y]] [[z]]\n")
     pairs = merge_candidates(build_graph(load_corpus(blank)))
     assert (Path("a.md"), Path("b.md")) == pairs[0][:2]
+
+
+def test_escaped_pipe_inside_a_table_link_resolves() -> None:
+    from research_ledger.corpus import parse_links
+
+    (link,) = parse_links("| see | [[1_RESULT\\|result]] |\n")
+    assert link.target == "1_RESULT"
+    assert link.shown == "result"

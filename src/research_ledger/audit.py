@@ -9,6 +9,8 @@ interface.
 from __future__ import annotations
 
 import json
+from collections import Counter
+from collections.abc import Iterable
 from datetime import date
 
 from pydantic import BaseModel, ConfigDict
@@ -89,18 +91,30 @@ def issue_keys(result: AuditResult) -> dict[str, list[str]]:
     """Stable identities of individual issues, so a later audit can tell new from old.
 
     Line numbers are left out of the keys on purpose: editing above an old issue
-    must not make it look new.
+    must not make it look new. For numbers the identity is the surrounding words in
+    plain text (``provenance._anchors``), not the raw line, so re-wrapping or linking
+    a nearby word does not make an untouched number look new either.
     """
     return {
         "dangling": [f"{d.source.as_posix()}->{d.target}" for d in result.graph.dangling],
         "orphans": list(result.orphans),
-        "unsourced": [
-            f"{u.path.as_posix()}|{u.number}|{u.context}"
+        "unsourced": _numbered(
+            f"{u.path.as_posix()}|{u.number}|{u.anchor}"
             for u in result.provenance.unsourced
-        ],
+        ),
         "lifecycle_missing": [p.as_posix() for p in result.lifecycle.missing],
         "stale": [p.as_posix() for p, _ in result.lifecycle.stale],
     }
+
+
+def _numbered(keys: Iterable[str]) -> list[str]:
+    """Suffix repeats (#2, #3) so identical anchors in one note stay distinct issues."""
+    seen: Counter[str] = Counter()
+    out = []
+    for key in keys:
+        seen[key] += 1
+        out.append(key if seen[key] == 1 else f"{key}#{seen[key]}")
+    return out
 
 
 def save_adopted(vault: Vault, result: AuditResult) -> None:
