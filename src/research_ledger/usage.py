@@ -2,7 +2,7 @@
 
 Every hook call appends one line to ``.ledger/usage.jsonl``: event, latency, how many
 characters it added to the conversation, and the outcome. Nothing is sent anywhere.
-``ledger feedback`` summarises it, so a beta tester's report can say "the prompt hook
+``ledger feedback`` summarises it, so a user's report can say "the prompt hook
 spoke on 40 of 120 prompts, median 80 ms" instead of "it felt noisy".
 
 No prompt text, note text or command is stored here, only counts.

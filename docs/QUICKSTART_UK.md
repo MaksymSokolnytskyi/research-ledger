@@ -1,6 +1,6 @@
-# Закритий бета-тест research-ledger
+# Швидкий старт research-ledger
 
-Дякую, що тестуєш! Тут усе, що потрібно: встановлення за 10 хвилин, що саме перевіряти
+Тут усе, що потрібно: встановлення за 10 хвилин, що варто перевірити в перший тиждень
 і як повідомляти про проблеми.
 
 ## Що це за штука, коротко
@@ -19,19 +19,29 @@ Ledger робить з папки нотаток або проєкту **баз�
 
 ## Встановлення
 
-Репозиторій поки приватний, тож потрібен доступ (запрошення від Максима) і вхід у
-GitHub на твоєму компʼютері: `gh auth login` або звичайний git credential manager.
+Python знати не потрібно. Ledger читає Markdown-нотатки і команди, які запускає Claude
+Code, тож однаково працює в проєкті на TypeScript, Go чи будь-якій іншій мові. Сам він
+написаний на Python, і найпростіше поставити його через [uv](https://docs.astral.sh/uv/):
+uv сам завантажить потрібний Python (3.11+) і тримає ledger в окремому середовищі, не
+чіпаючи інструменти твого проєкту.
 
-1. Пакет (Python 3.11+):
+1. Команда `ledger`:
 
    ```bash
-   pip install "git+https://github.com/MaksymSokolnytskyi/research-ledger"
+   # uv (пропусти, якщо вже є)
+   curl -LsSf https://astral.sh/uv/install.sh | sh                                  # macOS, Linux
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # Windows
+
+   uv tool install "git+https://github.com/MaksymSokolnytskyi/research-ledger"
    ledger --version
    ```
 
-   Якщо `ledger` не знаходиться: на Windows папка `Scripts` твого Python має бути в
-   PATH. Альтернатива без цієї проблеми: `pipx install "git+https://..."` або
-   `uv tool install "git+https://..."`.
+   Якщо `ledger` не знаходиться, виконай `uv tool update-shell` і відкрий новий
+   термінал. Якщо ти вже працюєш з Python, підійде і
+   `pip install "git+https://github.com/MaksymSokolnytskyi/research-ledger"`.
+
+   Можна й не ставити руками: спершу встанови плагін (крок 2), відкрий нову сесію Claude
+   Code і запусти `/research-ledger:onboard`. Скіл сам поставить `ledger` через uv.
 
 2. Плагін у Claude Code:
 
@@ -58,7 +68,7 @@ GitHub на твоєму компʼютері: `gh auth login` або звича
 
 Нова порожня база: `ledger init my-research --language uk` (без `--existing`).
 
-## Що перевіряти (тиждень звичайної роботи)
+## Що перевірити в перший тиждень
 
 - **Встановлення:** скільки часу зайняло, де застряг.
 - **Шум:** чи заважає контекст, який ledger додає до промптів? Якщо так, у

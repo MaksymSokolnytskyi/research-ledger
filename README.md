@@ -23,13 +23,30 @@ keeps everything it adds under one `ledger/` folder, and turns existing debt int
 starting baseline instead of a wall of errors. Everything runs locally; nothing is sent
 anywhere.
 
-> **Closed beta.** Testers: start with [docs/BETA_UK.md](docs/BETA_UK.md).
+> **Early version (0.1).** Bug reports and ideas are welcome: open an
+> [issue](https://github.com/MaksymSokolnytskyi/research-ledger/issues/new/choose) or run
+> `ledger feedback`. Quick start in Ukrainian: [docs/QUICKSTART_UK.md](docs/QUICKSTART_UK.md).
 
 ## Install
 
+You do not need to know Python. research-ledger reads Markdown notes and the commands
+Claude Code runs, so it works the same in a TypeScript, Go or any other project. It is
+written in Python, and the simplest way to get it is [uv](https://docs.astral.sh/uv/),
+which downloads a suitable Python (3.11+) by itself and keeps the ledger in its own
+environment, away from your project's tools:
+
 ```bash
-pip install "git+https://github.com/MaksymSokolnytskyi/research-ledger"
+# 1. uv (skip if you have it)
+curl -LsSf https://astral.sh/uv/install.sh | sh                                  # macOS, Linux
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"   # Windows
+
+# 2. the ledger command
+uv tool install "git+https://github.com/MaksymSokolnytskyi/research-ledger"
+ledger --version          # if not found: uv tool update-shell, then open a new terminal
 ```
+
+Already working with Python? `pip install "git+https://github.com/MaksymSokolnytskyi/research-ledger"`
+or `pipx install` with the same URL works too.
 
 Then, for Claude Code (hooks and skills; inert in folders without `ledger.toml`):
 
@@ -39,6 +56,9 @@ Then, for Claude Code (hooks and skills; inert in folders without `ledger.toml`)
 
 or in a shell: `claude plugin marketplace add MaksymSokolnytskyi/research-ledger`
 followed by `claude plugin install research-ledger@research-ledger`.
+
+You can also install the plugin first and let Claude do the rest: in a new session run
+`/research-ledger:onboard`, and it will install the `ledger` command with uv if it is missing.
 
 ## Start
 

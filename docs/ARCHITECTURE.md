@@ -72,7 +72,7 @@ when it has a test and a measurement on a real vault.
 
 ## Phases
 
-1. **Data (weeks 1–4).** Hint log and success hook for the author and 2–3 beta testers.
+1. **Data (weeks 1–4).** Hint log and success hook for the author and 2–3 early users.
 2. **Offline evaluation (weeks 5–7).** Bandit vs BM25 vs PPR on the log.
 3. **LintBench v0 (weeks 6–10, in parallel).** A benchmark of vault upkeep built from
    git history and synthetic corruptions.
